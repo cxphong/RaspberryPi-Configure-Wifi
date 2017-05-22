@@ -1,7 +1,6 @@
 import multiprocessing
 import socket
-import json
-from edision import Edision
+from cli import CLI
 
 class Server(object):
     def __init__(self, hostname, port, callback):
@@ -10,7 +9,6 @@ class Server(object):
         self.hostname = hostname
         self.port = port
         self.callback = callback
-        self.edision = Edision()
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
     def stop(self):
@@ -31,14 +29,6 @@ class Server(object):
             process.daemon = True
             process.start()
             self.logger.debug("Started process %r", process)
-
-    def get_ip_address(self, ifname):
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        return socket.inet_ntoa(fcntl.ioctl(
-                                            s.fileno(),
-                                            0x8915,  # SIOCGIFADDR
-                                            struct.pack('256s', ifname[:15])
-                                            )[20:24])
     
     def __handle(self, connection, address):
         import logging
@@ -47,17 +37,29 @@ class Server(object):
         try:
             logger.debug("Connected %r at %r", connection, address)
             while True:
-                if self.edision.showWiFiMode() == "Master":
-                    ssid = self.edision.getAPName()
-                    mac = self.edision.getMAC()
+                if CLI.get_wifi_mode() == "Master":
+                    ssid = CLI.get_ap_name()
+                    mac = CLI.get_mac_address()
                     str = "{mode:\"AP\", ssid=\"" + ssid + "\", mac: \"" + mac + "\"}"
                     connection.sendall(str)
-                elif self.edision.showWiFiMode() == "Managed":
-                    ip = self.edision.getIPAddress()
-                    netmask = self.edision.getNetmask()
-                    gateway = self.edision.getGateway()
-                    ssid = self.edision.getCurrentSSID()
-                    
+                elif CLI.get_wifi_mode() == "Managed":
+                    ip = CLI.get_ip()
+                    netmask = CLI.get_netmask()
+                    gateway = CLI.get_gateway('wlan0')
+                    ssid = CLI.get_connected_ssid_name()
+
+                    if ip is None:
+                        ip = ""
+
+                    if netmask is None:
+                        netmask = ""
+
+                    if gateway is None:
+                        gateway = ""
+
+                    if ssid is None:
+                        ssid = ""
+
                     str = "{mode: \"CLIENT\", ip: \"" + ip + "\", netmask: \"" + netmask + "\", gateway: \"" + gateway +"\", ssid: \"" + ssid + "\"}"
                     connection.sendall(str)
                 

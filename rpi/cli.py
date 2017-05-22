@@ -9,6 +9,7 @@ import time
 import os
 import subprocess
 from PhFile import PhFile
+import netifaces
 
 global nw_config
 global server
@@ -38,7 +39,7 @@ class CLI(object):
     	subprocess.call("sudo update-rc.d dnsmasq disable", shell=True);
     	subprocess.call("sudo ifdown wlan0", shell=True);
     	subprocess.call("sudo ifup wlan0", shell=True);
-	subprocess.call("sudo dhclient -i wlan", shell=True)
+        subprocess.call("sudo dhclient -i wlan", shell=True)
 
     @staticmethod
     def start_accesspoint_mode():
@@ -60,7 +61,6 @@ class CLI(object):
 
     @staticmethod
     def get_ip():
-        ipstr = ''
         try:
             ipstr = subprocess.check_output('ifconfig wlan0 | grep \'inet addr:\'', shell=True)
         except subprocess.CalledProcessError:
@@ -77,5 +77,49 @@ class CLI(object):
         ipstr = ipstr[ipstr.find('inet addr:')+10:].split()[0]
         return ipstr
 
-CLI.join_into_wifi('Fiot_09', 'passnhucufsfsfs')
-print CLI.get_ip()
+    @staticmethod
+    def get_wifi_mode():
+        try:
+            modestr = subprocess.check_output('iwconfig wlan0 | grep Mode:', shell=True)
+        except subprocess.CalledProcessError:
+            print >> sys.stderr, "No interface found."
+            return None
+        except Exception as inst:
+            print >> sys.stderr, type(inst)
+            print >> sys.stderr, inst
+            return None
+
+        startIdx = modestr.find('Mode:')
+        if (startIdx == -1):
+            return None
+
+        modestr = modestr[modestr.find('Mode:') + 5:].split()[0]
+        return modestr
+
+    @staticmethod
+    def get_gateway(interface_name):
+        gw = netifaces.gateways()
+
+        try:
+            if gw['default'][netifaces.AF_INET][1] == interface_name:
+                gw['default'][netifaces.AF_INET][0]
+            else:
+                return None
+        except:
+            return None
+
+    @staticmethod
+    def get_connected_ssid_name():
+        return os.popen("iwgetid -r").read().rstrip()
+
+    @staticmethod
+    def get_netmask():
+        return os.popen("ifconfig wlan0 | grep 'inet addr:' | awk '{print $4}' | awk -F':' '{print $2}'").read().rstrip()
+
+    @staticmethod
+    def get_mac_address():
+        return os.popen("ifconfig wlan0 | awk 'FNR==1 {print $5}'").read().rstrip()
+
+    @staticmethod
+    def get_ap_name():
+        return os.popen("grep '^ssid=' /etc/hostapd/hostapd.conf | awk -F'=' '{ print $2 }'").read().rstrip()
